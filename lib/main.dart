@@ -2,8 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-typedef PickerConfirmCallback = void Function(DateTime start, DateTime end);
-
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
@@ -44,8 +42,10 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: PickerWidget(
-          DateTime.now(), DateTime.now().add(Duration(days: 20)), 5,
-          onConfirm: (start, end) {}),
+        DateTime.now(),
+        DateTime.now().add(Duration(hours: 1)),
+        5,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,
         tooltip: 'Increment',
@@ -56,16 +56,14 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class PickerWidget extends StatefulWidget {
-  DateTime initialStartTime;
-  DateTime initialEndTime;
-
-  final VoidCallback onCancel;
-  final PickerConfirmCallback onConfirm;
-
+  final DateTime initialStartTime;
+  final DateTime initialEndTime;
   final int interval;
+  final Function(DateTime dateTime) onStartDateChanged;
+  final Function(DateTime dateTime) onEndDateChanged;
 
   PickerWidget(this.initialStartTime, this.initialEndTime, this.interval,
-      {this.onCancel, this.onConfirm, Key key})
+      {Key key, this.onStartDateChanged, this.onEndDateChanged})
       : super(key: key);
 
   _PickerWidgetState createState() => _PickerWidgetState();
@@ -73,33 +71,33 @@ class PickerWidget extends StatefulWidget {
 
 class _PickerWidgetState extends State<PickerWidget>
     with SingleTickerProviderStateMixin {
-  DateTime start;
-  DateTime end;
+  DateTime startDate;
+  DateTime endDate;
   bool startVisible = false;
   bool endVisible = false;
+
+  //TextEditingController _startDateController;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialStartTime == null) {
-      widget.initialStartTime = DateTime.now();
-    }
+
+    widget.initialStartTime != null
+        ? startDate = widget.initialStartTime
+        : startDate = DateTime.now();
 
     // Remove minutes and seconds
-    widget.initialStartTime = widget.initialStartTime.subtract(Duration(
-        minutes: widget.initialStartTime.minute,
-        seconds: widget.initialStartTime.second));
+    startDate = startDate.subtract(
+        Duration(minutes: startDate.minute, seconds: startDate.second));
 
-    if (widget.initialEndTime == null) {
-      widget.initialEndTime =
-          widget.initialStartTime.add(Duration(days: 0, hours: 2));
-    }
+    widget.initialEndTime != null
+        ? endDate = widget.initialEndTime
+        : endDate = startDate.add(Duration(days: 0, hours: 1));
 
-    widget.initialEndTime = widget.initialEndTime.subtract(Duration(
-        minutes: widget.initialEndTime.minute,
-        seconds: widget.initialEndTime.second));
-    start = widget.initialStartTime;
-    end = widget.initialEndTime;
+    endDate = endDate
+        .subtract(Duration(minutes: endDate.minute, seconds: endDate.second));
+
+    //_startDateController = TextEditingController(text: DateFormat.yMMMMd("en_US").add_jm().format(start));
   }
 
   @override
@@ -117,66 +115,143 @@ class _PickerWidgetState extends State<PickerWidget>
               startVisible = !startVisible;
             });
           },
-          child: Padding(
-            padding: EdgeInsets.only(top: 20, left: 16, right: 16),
-            child: Container(
-              alignment: Alignment.center,
-              height: 64,
-              decoration: BoxDecoration(
-                  border: Border.all(width: 1, color: Colors.black),
-                  borderRadius: BorderRadius.circular(6)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: <Widget>[
-                  Text('Starts:', textAlign: TextAlign.left),
-                  Container(
-                    height: 16.0,
-                    width: 1.0,
-                    color: Colors.black,
-                    margin: const EdgeInsets.only(left: 10.0, right: 10.0),
-                  ),
-                  Text(DateFormat.yMMMMd("en_US").add_jm().format(start),
-                      textAlign: TextAlign.right)
-                ],
-              ),
-            ),
+          child: IOSDateField(
+            label: 'Starts:',
+            dateTime: startDate,
           ),
         ),
         Visibility(
           visible: startVisible,
           child: SizedBox(
             height: 160,
-            child: CupertinoDatePicker(
-              mode: CupertinoDatePickerMode.dateAndTime,
+            child: IOSDatePicker(
               minuteInterval: widget.interval,
-              initialDateTime: start,
-              onDateTimeChanged: (DateTime newDateTime) {
+              initialDateTime: startDate,
+              onDateChanged: (DateTime newDateTime) {
                 Future.delayed(const Duration(milliseconds: 1000), () {
                   setState(() {
-                    start = newDateTime;
+                    startDate = newDateTime;
+                    if (widget.onStartDateChanged != null)
+                      widget.onStartDateChanged(newDateTime);
+                    //_startDateController.text = DateFormat.yMMMMd("en_US").add_jm().format(newDateTime);
                   });
                 });
               },
             ),
           ),
         ),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              endVisible = !endVisible;
+            });
+          },
+          child: IOSDateField(
+            label: 'Ends:',
+            dateTime: endDate,
+          ),
+        ),
         Visibility(
           visible: endVisible,
           child: SizedBox(
             height: 160,
-            child: CupertinoDatePicker(
-              mode: CupertinoDatePickerMode.dateAndTime,
+            child: IOSDatePicker(
               minuteInterval: widget.interval,
-              initialDateTime: end,
-              onDateTimeChanged: (DateTime newDateTime) {
-                setState(() {
-                  end = newDateTime;
+              initialDateTime: endDate,
+              onDateChanged: (DateTime newDateTime) {
+                Future.delayed(const Duration(milliseconds: 1000), () {
+                  setState(() {
+                    endDate = newDateTime;
+                    if (widget.onEndDateChanged != null)
+                      widget.onEndDateChanged(newDateTime);
+                    //_startDateController.text = DateFormat.yMMMMd("en_US").add_jm().format(newDateTime);
+                  });
                 });
               },
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+final Color kColor_lightGrey_text_bg = new Color.fromRGBO(11, 17, 45, 0.3);
+final Color kColor_dark_text = Colors.black87;
+final Color kColor_seperator_bg = Colors.black87;
+
+TextStyle textStyle(Color color, FontWeight weight, double size,
+    {FontStyle style = FontStyle.normal, double lineHeight = 1}) {
+  return new TextStyle(
+      color: color, fontWeight: weight, fontSize: size, height: lineHeight);
+}
+
+class IOSDatePicker extends StatelessWidget {
+  final int minuteInterval;
+  final DateTime initialDateTime;
+  final Function(DateTime dateTime) onDateChanged;
+
+  IOSDatePicker({
+    this.minuteInterval,
+    this.initialDateTime,
+    this.onDateChanged,
+  })  : assert(minuteInterval != null),
+        assert(initialDateTime != null),
+        assert(onDateChanged != null);
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoDatePicker(
+      mode: CupertinoDatePickerMode.dateAndTime,
+      minuteInterval: minuteInterval,
+      initialDateTime: initialDateTime,
+      onDateTimeChanged: (DateTime newDateTime) {
+        onDateChanged(newDateTime);
+      },
+    );
+  }
+}
+
+class IOSDateField extends StatelessWidget {
+  final String label;
+  final DateTime dateTime;
+
+  IOSDateField({this.label, this.dateTime})
+      : assert(dateTime != null),
+        assert(label != null);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: 20, left: 16, right: 16),
+      child: Container(
+        alignment: Alignment.center,
+        height: 64,
+        decoration: BoxDecoration(
+            border: Border.all(width: 1, color: Colors.black),
+            borderRadius: BorderRadius.circular(6)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            Text(
+              label,
+              textAlign: TextAlign.left,
+              style: textStyle(kColor_dark_text, FontWeight.w600, 16),
+            ),
+            Container(
+              height: 30.0,
+              width: 1.0,
+              color: kColor_seperator_bg,
+              margin: const EdgeInsets.symmetric(vertical: 9),
+            ),
+            Text(
+              DateFormat.yMMMMd("en_US").add_jm().format(dateTime),
+              textAlign: TextAlign.right,
+              style: textStyle(kColor_dark_text, FontWeight.w600, 16),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
